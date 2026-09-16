@@ -152,7 +152,11 @@ export default class ShaderTester {
 
         if (!this.texture) {
             const textureResult = await this.textureLoader.loadAsync(`./shaders/${this.shaderName}/uTexture0.png`).catch(() => console.log("found no default texture for shader:", this.shaderName));
-            if (textureResult) this.texture = textureResult;
+            if (textureResult) {
+                textureResult.flipY = false;
+                textureResult.generateMipmaps = false;
+                this.texture = textureResult;
+            }
         }
 
         const uniforms = {
