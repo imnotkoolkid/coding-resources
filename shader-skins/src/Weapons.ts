@@ -1,9 +1,14 @@
 export enum Weapon {
     AssaultRifle,
     Sniper,
-    Shotgun = 4,
-    Mac10 = 6,
-    Famas = 8,
+    Mp5,
+    MachineGun,
+    Shotgun,
+    Revolver,
+    Mac10,
+    SemiAuto,
+    Famas,
     Pistol = 20,
+    DesertEagle,
     Melee = 30,
 }

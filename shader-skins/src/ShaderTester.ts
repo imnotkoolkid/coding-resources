@@ -1,6 +1,10 @@
 import {
+    AnimationAction,
+    AnimationClip,
+    AnimationMixer,
     ColorManagement,
     FileLoader,
+    LoopOnce,
     Mesh,
     PerspectiveCamera,
     Scene,
@@ -40,6 +44,9 @@ export default class ShaderTester {
     deltaTime: number;
     timeSinceLastKill: number;
     print: number;
+
+    animationMixer: AnimationMixer | undefined;
+    shootAnimation: AnimationAction | undefined;
 
     constructor(shaderName: string) {
 
@@ -92,24 +99,27 @@ export default class ShaderTester {
         // this.mesh = new Mesh(new BoxGeometry(2, 2, 2));
 
         this.guiManager = new GuiManager(async (weapon: string) => {
-            this.loadModel(weapon).catch(console.error);
-        }, async (url: string) => {
-            this.texture = await this.textureLoader.loadAsync(url);
-            this.texture.flipY = false;
-            this.texture.generateMipmaps = false;
-            this.material.uniforms["uChannel0"].value = this.texture;
-        }, (print: number) => {
-          this.print = print;
-          this.material.uniforms["uPrint"].value = this.print;
-        }, () => {
-          this.timeSinceLastKill = 0;
-        }, async (shader: string) => {
-            this.shaderName = shader;
-            this.texture = undefined; 
-            if (this.mesh) {
-                await this.createMaterial();
-            }
-        }, this.shaderName
+                this.loadModel(weapon).catch(console.error);
+            }, async (url: string) => {
+                this.texture = await this.textureLoader.loadAsync(url);
+                this.texture.flipY = false;
+                this.texture.generateMipmaps = false;
+                this.material.uniforms["uChannel0"].value = this.texture;
+            }, (print: number) => {
+                this.print = print;
+                this.material.uniforms["uPrint"].value = this.print;
+            }, () => {
+                this.timeSinceLastKill = 0;
+            }, () => {
+                this.shootAnimation?.reset().play();
+            }, async (shader: string) => {
+                this.shaderName = shader;
+                this.texture = undefined;
+                if (this.mesh) {
+                    await this.createMaterial();
+                }
+            },
+            this.shaderName
         );
 
 
@@ -129,6 +139,8 @@ export default class ShaderTester {
         this.deltaTime = (now - this.lastTime) * 0.001; // deltaTime in seconds
         this.lastTime = now;
 
+        this.animationMixer?.update(this.deltaTime);
+
         this.renderer.render(this.scene, this.camera);
 
     }
@@ -144,11 +156,11 @@ export default class ShaderTester {
         }
 
         const uniforms = {
-            uTime: { value: 1 }, // start with 1 to avoid potential divisions by 0
-            uResolution: { value: new Vector2(window.innerWidth, window.innerHeight) },
-            uChannel0: { value: this.texture ? this.texture : await this.textureLoader.loadAsync("./images/missing.png") },
-            uPrint: { value: 1 },
-            uTimeSinceLastKill: { value: 0 },
+            uTime: {value: 1}, // start with 1 to avoid potential divisions by 0
+            uResolution: {value: new Vector2(window.innerWidth, window.innerHeight)},
+            uChannel0: {value: this.texture ? this.texture : await this.textureLoader.loadAsync("./images/missing.png")},
+            uPrint: {value: 1},
+            uTimeSinceLastKill: {value: 0},
         };
 
         const shaderMaterial = new ShaderMaterial({
@@ -175,15 +187,34 @@ export default class ShaderTester {
             const model = glb.scene.children[0];
             const skinnedMesh = (model.children[0] ? model.children[0] : model) as SkinnedMesh;
 
-            //cleanup of previous model
+            this.animationMixer = new AnimationMixer(skinnedMesh);
+
+            const shootClip = AnimationClip.findByName(glb.animations, "shoot");
+            if (shootClip) {
+                this.shootAnimation = this.animationMixer.clipAction(shootClip).setLoop(LoopOnce, 1);
+            }
+
+            // cleanup of previous model
             if (this.mesh) {
-                this.mesh.geometry.dispose();
-                if (Array.isArray(this.mesh.material)) {
-                    this.mesh.material.forEach(m => m.dispose());
-                } else {
-                    this.mesh.material.dispose();
-                }
-                this.scene.remove(this.mesh);
+
+                // to not modify the scene graph in traverse
+                const objectsToRemove = new Set<Mesh>();
+
+                this.scene.traverse((obj: Mesh) => {
+                    objectsToRemove.add(obj)
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach(m => m.dispose());
+                        } else {
+                            obj.material.dispose();
+                        }
+                    }
+                    if (obj.geometry) obj.geometry.dispose();
+                });
+
+                objectsToRemove.forEach((obj) => {
+                    this.scene.remove(obj);
+                });
             }
 
             this.mesh = skinnedMesh;
@@ -192,7 +223,7 @@ export default class ShaderTester {
             this.mesh.rotateY(-Math.PI * 0.5);
             this.mesh.scale.setScalar(0.4);
 
-            this.scene.add(this.mesh);
+            this.scene.add(model);
         });
 
     }

@@ -1,4 +1,4 @@
-import { Weapon } from "./Weapons";
+import {Weapon} from "./Weapons";
 
 export default class GuiManager {
     elements: { [id: string]: HTMLElement | undefined } = {
@@ -7,6 +7,7 @@ export default class GuiManager {
         textureInput: undefined,
         timeSinceLastKillReset: undefined,
         printSelector: undefined,
+        playShootAnimButton: undefined,
         shaderSelector: undefined,
         shaderPrevBtn: undefined,
         shaderNextBtn: undefined,
@@ -17,8 +18,9 @@ export default class GuiManager {
         onTextureChange: (texture: string) => void,
         onPrintChange: (print: number) => void,
         onTimeSinceLastKillReset: () => void,
-        onShaderChange?: (shader: string) => Promise<void>,
-        initialShader?: string
+        onPlayShoot: () => void,
+        onShaderChange: (shader: string) => Promise<void>,
+        initialShader: string
     ) {
         for (let elementId in this.elements) {
             this.elements[elementId] = document.getElementById(elementId);
@@ -53,13 +55,13 @@ export default class GuiManager {
         if (shaderSelector && onShaderChange) {
             const shaders = (import.meta as any).glob('/public/shaders/**/fragment.frag');
             const shaderNames = Object.keys(shaders).map(path => path.replace('/public/shaders/', '').replace('/fragment.frag', ''));
-            
+
             for (let shaderName of shaderNames) {
                 const listElement = document.createElement("option");
                 listElement.innerText = listElement.value = shaderName;
                 shaderSelector.appendChild(listElement);
             }
-            
+
             const lastUsedShader = localStorage.getItem("lastUsedShader");
             if (lastUsedShader && shaderNames.includes(lastUsedShader)) {
                 shaderSelector.value = lastUsedShader;
@@ -71,7 +73,7 @@ export default class GuiManager {
                 shaderSelector.value = shaderNames[0];
                 setTimeout(() => onShaderChange(shaderNames[0]), 0);
             }
-            
+
             const triggerShaderChange = async () => {
                 const value = shaderSelector.value;
                 await onShaderChange(value);
@@ -147,8 +149,7 @@ export default class GuiManager {
             }
         });
 
-        const timeSinceLastKillResetButton = this.elements
-            .timeSinceLastKillReset as HTMLButtonElement;
+        const timeSinceLastKillResetButton = this.elements.timeSinceLastKillReset as HTMLButtonElement;
 
         timeSinceLastKillResetButton.addEventListener("click", () => {
             onTimeSinceLastKillReset();
@@ -162,6 +163,10 @@ export default class GuiManager {
                 onPrintChange(value);
             }
         });
+
+
+        const playShootAnimButton = this.elements.playShootAnimButton as HTMLButtonElement;
+        playShootAnimButton.addEventListener("click", onPlayShoot);
 
         const bgTypeSelector = document.getElementById("bgTypeSelector") as HTMLSelectElement;
         const bgSolidSettings = document.getElementById("bgSolidSettings") as HTMLDivElement;
@@ -178,7 +183,7 @@ export default class GuiManager {
         const updateBackground = () => {
             if (!bgTypeSelector) return;
             const type = bgTypeSelector.value;
-            
+
             localStorage.setItem("bgType", type);
             if (bgColorPicker) localStorage.setItem("bgColor", bgColorPicker.value);
             if (bgCheckerColor1) localStorage.setItem("bgChecker1", bgCheckerColor1.value);
